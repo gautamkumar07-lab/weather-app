@@ -1,0 +1,14 @@
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs & temp files
+*.log
+npm-debug.log*
+
+# Editor directories
+.vscode/
+.idea/
+
+# Node dependencies (if any)
+node_modules/

@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SkyPulse | Modern Glassmorphism Weather Forecast</title>
+  <meta name="description" content="A modern, responsive weather forecast application featuring glassmorphism design, real-time data, 5-day forecast, dynamic animated backgrounds, and dark/light modes.">
+
+  <!-- Google Fonts: Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome 6 Icons CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌤️</text></svg>">
+</head>
+<body class="condition-sunny">
+
+  <!-- Dynamic Background Canvas for Particles (Rain, Snow, Sunny Dust, Clouds) -->
+  <canvas id="weather-canvas" class="weather-canvas" aria-hidden="true"></canvas>
+
+  <!-- Ambient Light Blobs for Glassmorphism Depth -->
+  <div class="ambient-glow glow-1" aria-hidden="true"></div>
+  <div class="ambient-glow glow-2" aria-hidden="true"></div>
+  <div class="ambient-glow glow-3" aria-hidden="true"></div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Main Application Wrapper -->
+  <div class="app-container">
+
+    <!-- Header Navigation Bar -->
+    <header class="app-header glass-card">
+      <div class="brand">
+        <div class="brand-icon">
+          <i class="fa-solid fa-cloud-sun-rain"></i>
+        </div>
+        <div class="brand-text">
+          <h1>SkyPulse</h1>
+          <span class="brand-tagline">Real-Time Weather Intel</span>
+        </div>
+      </div>
+
+      <!-- Live Clock & Date Badge for Searched City -->
+      <div class="live-datetime-badge">
+        <i class="fa-regular fa-clock"></i>
+        <div class="datetime-info">
+          <span id="header-time" class="time-display">--:--:--</span>
+          <span id="header-date" class="date-display">Loading date...</span>
+        </div>
+      </div>
+
+      <!-- Control Actions (Unit Switch, Theme Toggle, Settings) -->
+      <div class="header-controls">
+        <!-- Celsius / Fahrenheit Switch -->
+        <div class="unit-toggle" role="group" aria-label="Temperature unit selection">
+          <button id="unit-c" class="unit-btn active" data-unit="metric" title="Switch to Celsius (°C)">°C</button>
+          <button id="unit-f" class="unit-btn" data-unit="imperial" title="Switch to Fahrenheit (°F)">°F</button>
+        </div>
+
+        <!-- Dark / Light Theme Toggle -->
+        <button id="theme-toggle" class="control-btn" title="Toggle Dark/Light Mode" aria-label="Toggle theme">
+          <i class="fa-solid fa-moon theme-icon"></i>
+        </button>
+
+        <!-- API Settings Modal Trigger -->
+        <button id="settings-toggle" class="control-btn" title="OpenWeatherMap API Key & Settings" aria-label="Settings">
+          <i class="fa-solid fa-gear"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Search Section -->
+    <section class="search-section">
+      <form id="search-form" class="search-bar-wrapper glass-card">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input 
+          type="text" 
+          id="search-input" 
+          placeholder="Search city, state or country (e.g. London, Tokyo, Paris)..." 
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Search city name"
+          required
+        >
+        <button type="button" id="clear-search-btn" class="clear-btn" title="Clear search" aria-label="Clear input" style="display: none;">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <button type="button" id="geo-location-btn" class="geo-btn" title="Use current location" aria-label="Use current location">
+          <i class="fa-solid fa-location-crosshairs"></i>
+          <span class="geo-text">My Location</span>
+        </button>
+        <button type="submit" class="submit-search-btn" aria-label="Search">
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </form>
+
+      <!-- Recent Searches Chips Bar -->
+      <div class="recent-searches-container" id="recent-searches-wrapper">
+        <div class="recent-header">
+          <span><i class="fa-solid fa-clock-rotate-left"></i> Recent Searches:</span>
+          <button id="clear-history-btn" class="clear-history-link" title="Clear all recent searches">Clear all</button>
+        </div>
+        <div class="recent-chips" id="recent-chips-list">
+          <!-- Dynamically populated chips -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Loading Skeleton Screen -->
+    <div id="loading-overlay" class="loading-overlay" aria-hidden="true" style="display: none;">
+      <div class="loader-content glass-card">
+        <div class="weather-spinner">
+          <div class="spinner-sun"></div>
+          <div class="spinner-cloud"></div>
+        </div>
+        <p class="loading-text">Fetching latest atmospheric data...</p>
+      </div>
+    </div>
+
+    <!-- Main Weather Content Grid -->
+    <main id="weather-dashboard" class="weather-dashboard">
+
+      <!-- Top Row: Hero Current Weather Card -->
+      <section class="hero-weather-card glass-card">
+        <div class="hero-header">
+          <div class="location-details">
+            <div class="city-name-wrapper">
+              <i class="fa-solid fa-location-dot location-pin"></i>
+              <h2 id="city-name" class="city-name">London</h2>
+              <span id="country-badge" class="country-badge">GB</span>
+            </div>
+            <p id="city-local-time" class="city-local-time">Local Time: Monday, 14:30</p>
+          </div>
+          <div class="weather-status-badge" id="condition-badge">
+            <span id="weather-condition-text">Scattered Clouds</span>
+          </div>
+        </div>
+
+        <div class="hero-body">
+          <div class="temperature-container">
+            <div class="temp-large-group">
+              <span id="current-temp" class="temp-value">22</span>
+              <span class="temp-degree">°</span>
+              <span id="current-temp-unit" class="temp-unit-symbol">C</span>
+            </div>
+            <div class="temp-meta">
+              <p class="feels-like">Feels like: <span id="feels-like-temp">24°C</span></p>
+              <div class="temp-range">
+                <span><i class="fa-solid fa-arrow-up"></i> High: <strong id="temp-max">25°C</strong></span>
+                <span><i class="fa-solid fa-arrow-down"></i> Low: <strong id="temp-min">18°C</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hero-icon-container">
+            <img id="weather-hero-icon" class="hero-weather-img" src="" alt="Weather Condition Icon" />
+            <span id="weather-description-sub" class="weather-sub-text">Partly cloudy throughout the day</span>
+          </div>
+        </div>
+
+        <div class="hero-footer">
+          <div class="quick-pill">
+            <i class="fa-solid fa-droplet"></i>
+            <span>Humidity: <strong id="quick-humidity">65%</strong></span>
+          </div>
+          <div class="quick-pill">
+            <i class="fa-solid fa-wind"></i>
+            <span>Wind: <strong id="quick-wind">14 km/h</strong></span>
+          </div>
+          <div class="quick-pill">
+            <i class="fa-solid fa-gauge-high"></i>
+            <span>Pressure: <strong id="quick-pressure">1013 hPa</strong></span>
+          </div>
+          <div class="quick-pill">
+            <i class="fa-solid fa-eye"></i>
+            <span>Visibility: <strong id="quick-visibility">10 km</strong></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Key Metrics Details Section (Glass Cards Grid) -->
+      <section class="metrics-grid">
+        <!-- Metric 1: Humidity -->
+        <div class="metric-card glass-card">
+          <div class="metric-header">
+            <span class="metric-label"><i class="fa-solid fa-water"></i> Humidity</span>
+            <span id="metric-humidity-badge" class="metric-status-badge badge-normal">Comfortable</span>
+          </div>
+          <div class="metric-value-wrap">
+            <span id="metric-humidity-val" class="metric-main-value">65</span>
+            <span class="metric-unit">%</span>
+          </div>
+          <div class="progress-bar-container">
+            <div id="humidity-progress" class="progress-bar-fill" style="width: 65%;"></div>
+          </div>
+          <p id="humidity-dew" class="metric-hint">The dew point is around 15°C right now.</p>
+        </div>
+
+        <!-- Metric 2: Wind Speed & Direction -->
+        <div class="metric-card glass-card">
+          <div class="metric-header">
+            <span class="metric-label"><i class="fa-solid fa-wind"></i> Wind Status</span>
+            <span id="wind-direction-text" class="metric-status-badge">NE (45°)</span>
+          </div>
+          <div class="metric-value-wrap">
+            <span id="metric-wind-val" class="metric-main-value">14.2</span>
+            <span id="metric-wind-unit" class="metric-unit">km/h</span>
+          </div>
+          <div class="wind-visual">
+            <div class="compass-dial">
+              <i id="compass-arrow" class="fa-solid fa-location-arrow compass-arrow"></i>
+            </div>
+            <div class="wind-gusts">
+              <span>Gusts up to: <strong id="wind-gust-val">22 km/h</strong></span>
+            </div>
+          </div>
+          <p class="metric-hint" id="wind-desc">Gentle breeze blowing</p>
+        </div>
+
+        <!-- Metric 3: Air Quality Index (AQI) -->
+        <div class="metric-card glass-card">
+          <div class="metric-header">
+            <span class="metric-label"><i class="fa-solid fa-lungs"></i> Air Quality Index</span>
+            <span id="aqi-status-badge" class="metric-status-badge badge-good">Good</span>
+          </div>
+          <div class="metric-value-wrap">
+            <span id="metric-aqi-val" class="metric-main-value">38</span>
+            <span class="metric-unit">AQI</span>
+          </div>
+          <div class="progress-bar-container">
+            <div id="aqi-progress" class="progress-bar-fill aqi-fill" style="width: 25%;"></div>
+          </div>
+          <p id="aqi-advice" class="metric-hint">Air quality is ideal for most outdoor activities.</p>
+        </div>
+
+        <!-- Metric 4: UV Index -->
+        <div class="metric-card glass-card">
+          <div class="metric-header">
+            <span class="metric-label"><i class="fa-solid fa-sun"></i> UV Index</span>
+            <span id="uv-status-badge" class="metric-status-badge badge-low">Low</span>
+          </div>
+          <div class="metric-value-wrap">
+            <span id="metric-uv-val" class="metric-main-value">2.4</span>
+            <span class="metric-unit">of 12</span>
+          </div>
+          <div class="progress-bar-container">
+            <div id="uv-progress" class="progress-bar-fill uv-fill" style="width: 20%;"></div>
+          </div>
+          <p id="uv-advice" class="metric-hint">Minimal protection required. Safe exposure.</p>
+        </div>
+
+        <!-- Metric 5: Sunrise & Sunset -->
+        <div class="metric-card glass-card sunrise-sunset-card">
+          <div class="metric-header">
+            <span class="metric-label"><i class="fa-solid fa-mountain-sun"></i> Sun Schedule</span>
+            <span id="daylight-duration" class="metric-status-badge">12h 45m</span>
+          </div>
+          <div class="sun-schedule-grid">
+            <div class="sun-time-item">
+              <i class="fa-solid fa-sunrise sun-up-icon"></i>
+              <div>
+                <span class="sun-label">Sunrise</span>
+                <span id="sunrise-time" class="sun-time">06:12 AM</span>
+              </div>
+            </div>
+            <div class="sun-time-item">
+              <i class="fa-solid fa-sunset sun-down-icon"></i>
+              <div>
+                <span class="sun-label">Sunset</span>
+                <span id="sunset-time" class="sun-time">07:45 PM</span>
+              </div>
+            </div>
+          </div>
+          <p id="sun-status-text" class="metric-hint">Daylight remaining: 4h 15m</p>
+        </div>
+
+        <!-- Metric 6: Atmospheric Pressure & Visibility -->
+        <div class="metric-card glass-card">
+          <div class="metric-header">
+            <span class="metric-label"><i class="fa-solid fa-compass"></i> Barometer & Vision</span>
+            <span class="metric-status-badge">Steady</span>
+          </div>
+          <div class="dual-metric-grid">
+            <div class="dual-item">
+              <span class="dual-label">Pressure</span>
+              <span class="dual-value"><strong id="metric-pressure-val">1013</strong> hPa</span>
+            </div>
+            <div class="dual-item">
+              <span class="dual-label">Visibility</span>
+              <span class="dual-value"><strong id="metric-visibility-val">10.0</strong> km</span>
+            </div>
+          </div>
+          <p id="pressure-desc" class="metric-hint">Standard atmospheric pressure level.</p>
+        </div>
+      </section>
+
+      <!-- 24-Hour Forecast Slider -->
+      <section class="hourly-forecast-section glass-card">
+        <div class="section-heading">
+          <div class="heading-title">
+            <i class="fa-solid fa-clock"></i>
+            <h3>Hourly Forecast (24-Hour Overview)</h3>
+          </div>
+          <span class="heading-subtitle">Next 24 hours in 3-hour intervals</span>
+        </div>
+        <div class="hourly-scroll-container" id="hourly-forecast-list">
+          <!-- Populated by JavaScript -->
+        </div>
+      </section>
+
+      <!-- 5-Day Weather Forecast Section -->
+      <section class="daily-forecast-section">
+        <div class="section-heading">
+          <div class="heading-title">
+            <i class="fa-solid fa-calendar-days"></i>
+            <h3>5-Day Weather Forecast</h3>
+          </div>
+          <span class="heading-subtitle">Extended outlook for the week</span>
+        </div>
+
+        <div class="forecast-cards-grid" id="five-day-forecast-grid">
+          <!-- Populated dynamically with 5 glass cards -->
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer glass-card">
+      <div class="footer-left">
+        <p><strong>SkyPulse Weather</strong> &copy; 2026. Built with HTML, CSS, JavaScript & Glassmorphism.</p>
+      </div>
+      <div class="footer-center" id="data-provider-badge">
+        <span class="source-tag"><i class="fa-solid fa-satellite-dish"></i> Provider: <span id="active-data-source">Live Engine</span></span>
+      </div>
+      <div class="footer-right">
+        <button id="footer-settings-btn" class="footer-link-btn"><i class="fa-solid fa-key"></i> Configure API Key</button>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- OpenWeatherMap API Settings Modal -->
+  <div id="settings-modal" class="modal-backdrop" aria-hidden="true" style="display: none;">
+    <div class="modal-card glass-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <i class="fa-solid fa-sliders modal-icon"></i>
+          <h3>API & Configuration Settings</h3>
+        </div>
+        <button id="close-modal-btn" class="close-btn" aria-label="Close settings dialog">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="settings-group">
+          <label for="api-key-input" class="settings-label">
+            <i class="fa-solid fa-key"></i> OpenWeatherMap API Key
+          </label>
+          <div class="api-input-wrap">
+            <input 
+              type="password" 
+              id="api-key-input" 
+              placeholder="Paste your 32-character API key here..."
+              autocomplete="off"
+            >
+            <button type="button" id="toggle-key-visibility" class="key-vis-btn" title="Toggle visibility">
+              <i class="fa-solid fa-eye"></i>
+            </button>
+          </div>
+          <p class="settings-help">
+            Don't have an OpenWeatherMap key? Get one free at 
+            <a href="https://home.openweathermap.org/users/sign_up" target="_blank" rel="noopener noreferrer">openweathermap.org</a>.
+          </p>
+        </div>
+
+        <div class="settings-info-box">
+          <i class="fa-solid fa-circle-info"></i>
+          <div>
+            <strong>Smart Dual-Engine Support:</strong>
+            <p>If you don't enter an OpenWeatherMap key, SkyPulse automatically falls back to the high-precision <strong>Open-Meteo Global Weather Service</strong> (zero key required!). You get 100% real live weather data either way!</p>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <label class="settings-label"><i class="fa-solid fa-server"></i> Active Service Preference</label>
+          <div class="provider-radio-group">
+            <label class="radio-option">
+              <input type="radio" name="provider-choice" value="auto" checked>
+              <span>Auto-Detect (Use OpenWeatherMap if key is valid, else Open-Meteo)</span>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="provider-choice" value="openmeteo">
+              <span>Always use Open-Meteo (Fast, Free, No API key needed)</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="test-api-btn" class="modal-secondary-btn">
+          <i class="fa-solid fa-vial"></i> Test Key
+        </button>
+        <button id="save-settings-btn" class="modal-primary-btn">
+          <i class="fa-solid fa-check"></i> Save & Apply
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript -->
+  <script src="app.js"></script>
+</body>
+</html>
